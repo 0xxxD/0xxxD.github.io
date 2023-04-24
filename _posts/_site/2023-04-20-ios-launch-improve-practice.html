@@ -1,0 +1,55 @@
+<blockquote>
+  <p><a href="https://www.infoq.cn/article/tx0tcv9h6lkvknokqn7i">抖音 iOS 启动优化实战</a>   对启动优化做了理论上的详细描述，BUT没有任何代码Demo开源 : (</p>
+
+  <p>这里我通过文中细节以及自己的测试实践来展示下demo级别的实现和原理，仅供参考。</p>
+
+  <p>有任何想法或者不足可以留言交流</p>
+</blockquote>
+
+<h3 id="监控实现">监控实现</h3>
+
+<p><img src="https://raw.githubusercontent.com/0xxxD/0xxxd.github.io/main/img/in-post/launch-phase.webp" style="zoom:75%;" /></p>
+
+<p>这里将上图箭头中六个时机用 <code class="language-plaintext highlighter-rouge">forkstart</code>  <code class="language-plaintext highlighter-rouge">loadstart</code> <code class="language-plaintext highlighter-rouge">mainStart</code> <code class="language-plaintext highlighter-rouge">appDelegateFinishLaunchStart</code> <code class="language-plaintext highlighter-rouge">appDelegateFinishLaunchEnd</code> <code class="language-plaintext highlighter-rouge">launchEnd</code> 表示</p>
+
+<p>实现细节见<a href="https://www.infoq.cn/article/tx0tcv9h6lkvknokqn7i">Demo</a></p>
+
+<ul>
+  <li>
+    <p>其中1到2阶段的时间节点是通过手动构造一个A的<strong>动态库</strong>，写个A.m然后实现+load方法保证第一个+load执行的时机（Cocoapods会根据pod名升序来注入依赖顺序），注意A的MachO Type动态库才行，最开始其实是实验出来的（用静态链接方式会发现其他某些库的load加载会在A之前），这里我通过dyld源码找到答案，这里就不展开了，感兴趣的可以看下我发的<a href="https://www.infoq.cn/article/tx0tcv9h6lkvknokqn7i">另一篇文章</a></p>
+
+    <p>后面应该会更新这里</p>
+  </li>
+  <li>
+    <p>时间节点获取通过<code class="language-plaintext highlighter-rouge">CACurrentMediaTime()</code>或者更为精确的</p>
+  </li>
+</ul>
+
+<hr />
+
+<h3 id="优化方案">优化方案：</h3>
+
+<h5 id="process-start阶段"><strong>Process Start阶段</strong>:</h5>
+
+<ul>
+  <li>尽量减少动态库数量，demo中基于cocoapods的话可在podfile通过添加<code class="language-plaintext highlighter-rouge">use_frameworks! :linkage =&gt; :static</code>来实践</li>
+  <li>减少<code class="language-plaintext highlighter-rouge">load</code>方法数量以减少pageIn和本身带来的耗时</li>
+  <li>二进制重排</li>
+  <li>动态库懒加载</li>
+</ul>
+
+<h5 id="pre-main阶段">pre main阶段:</h5>
+
+<ul>
+  <li>可以通过hook的方式统计项目中存在的+load方法情况，日常防裂化可以可以通过CI静态分析来做，这个就不在这里展开</li>
+  <li>
+    <p>对某些影响启动时间的第三方静态库（比如QCloudCOSXML中这个<a href="https://github.com/tencentyun/qcloud-sdk-ios/issues/36">issue</a>）中categry和class中的+load通过hook的方式延迟到启动结束且runloop空闲时执行（这里其实可以加入更多非启动必须库的+load的白名单范围做进一步优化）</p>
+
+    <ul>
+      <li>具体实现见<a href="">demo</a>,</li>
+    </ul>
+  </li>
+  <li>对于C++构造函数的执行，可以</li>
+</ul>
+
+<p>首先建立一个</p>
